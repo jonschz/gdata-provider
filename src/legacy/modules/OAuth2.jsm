@@ -40,8 +40,7 @@ OAuth2.prototype = {
 
   authURI: "https://accounts.google.com/o/oauth2/v2/auth",
   tokenURI: "https://oauth2.googleapis.com/token",
-  redirectURI: "urn:ietf:wg:oauth:2.0:oob:auto",
-  completionURI: "https://accounts.google.com/o/oauth2/approval/v2",
+  completionURI: "https://localhost:PORT/",
   errorURI: "https://accounts.google.com/signin/oauth/error",
 
   requestWindowURI: "chrome://messenger/content/browserRequest.xhtml",
@@ -79,10 +78,13 @@ OAuth2.prototype = {
   },
 
   requestAuthorization: function() {
+    let randomPort = Math.floor(Math.random() * (65535 - 49152 + 1) + 49152);
+    let completionRE = new RegExp("^https?://localhost:" + randomPort + "/");
+
     let params = [
       ["response_type", this.responseType],
       ["client_id", this.consumerKey],
-      ["redirect_uri", this.redirectURI],
+      ["redirect_uri", this.completionURI.replace(/PORT/, randomPort)],
     ];
     // The scope can be optional.
     if (this.scope) {
@@ -132,7 +134,7 @@ OAuth2.prototype = {
           },
 
           _checkForRedirect: function(aURL) {
-            if (aURL.startsWith(this._parent.completionURI)) {
+            if (aURL.match(completionRE)) {
               this._parent.finishAuthorizationRequest();
               this._parent.onAuthorizationReceived(aURL);
             } else if (aURL.startsWith(this._parent.errorURI)) {
@@ -215,7 +217,7 @@ OAuth2.prototype = {
     this.log.info("authorization received" + aData);
     let params = new URL(aData).searchParams;
     if (this.responseType == "code") {
-      this.requestAccessToken(params.get("approvalCode"), OAuth2.CODE_AUTHORIZATION);
+      this.requestAccessToken(params.get("code"), OAuth2.CODE_AUTHORIZATION);
     } else if (this.responseType == "token") {
       this.onAccessTokenReceived(JSON.stringify(Object.fromEntries(params.entries())));
     }
@@ -234,8 +236,9 @@ OAuth2.prototype = {
     ];
 
     if (aType == OAuth2.CODE_AUTHORIZATION) {
+      let randomPort = Math.floor(Math.random() * (65535 - 49152 + 1) + 49152);
       params.push(["code", aCode]);
-      params.push(["redirect_uri", this.redirectURI]);
+      params.push(["redirect_uri", this.completionURI.replace(/PORT/, randomPort)]);
     } else if (aType == OAuth2.CODE_REFRESH) {
       params.push(["refresh_token", aCode]);
     }
